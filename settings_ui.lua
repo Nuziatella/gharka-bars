@@ -23,8 +23,14 @@ local SettingsUi = {
     actions = nil,
     dragging = false,
     active_page = "general",
-    page_widgets = { general = {}, layout = {}, text = {}, colors = {} }
+    page_widgets = { general = {}, layout = {}, text = {}, colors = {} },
+    color_page = 1,
+    color_page_count = 1,
+    color_group_widgets = {}
 }
+
+local BASE_WINDOW_WIDTH = 980
+local BASE_WINDOW_HEIGHT = 900
 
 local function safeShow(widget, show)
     if widget ~= nil and widget.Show ~= nil then
@@ -160,6 +166,63 @@ local function setStatus(text)
     end
 end
 
+local function applyWindowScale()
+    if SettingsUi.window == nil or SettingsUi.window.SetScale == nil then
+        return
+    end
+    local screenWidth = 1920
+    local screenHeight = 1080
+    pcall(function()
+        if api.Interface ~= nil and api.Interface.GetScreenWidth ~= nil then
+            screenWidth = tonumber(api.Interface:GetScreenWidth()) or screenWidth
+        end
+        if api.Interface ~= nil and api.Interface.GetScreenHeight ~= nil then
+            screenHeight = tonumber(api.Interface:GetScreenHeight()) or screenHeight
+        end
+    end)
+    local widthScale = (screenWidth - 40) / BASE_WINDOW_WIDTH
+    local heightScale = (screenHeight - 60) / BASE_WINDOW_HEIGHT
+    local scale = math.min(1, widthScale, heightScale)
+    if scale < 0.7 then
+        scale = 0.7
+    end
+    pcall(function()
+        SettingsUi.window:SetScale(scale)
+    end)
+end
+
+local function refreshColorPage()
+    if type(SettingsUi.color_group_widgets) ~= "table" then
+        return
+    end
+    local currentPage = Shared.Clamp(SettingsUi.color_page, 1, SettingsUi.color_page_count or 1, 1)
+    SettingsUi.color_page = currentPage
+    for _, entry in pairs(SettingsUi.color_group_widgets) do
+        local show = entry.page == currentPage
+        for _, widget in ipairs(entry.widgets or {}) do
+            safeShow(widget, show and SettingsUi.active_page == "colors")
+        end
+    end
+    if SettingsUi.controls.color_page_label ~= nil and SettingsUi.controls.color_page_label.SetText ~= nil then
+        SettingsUi.controls.color_page_label:SetText(string.format("Page %d / %d", currentPage, math.max(1, SettingsUi.color_page_count or 1)))
+    end
+    if SettingsUi.controls.color_prev ~= nil and SettingsUi.controls.color_prev.Enable ~= nil then
+        pcall(function()
+            SettingsUi.controls.color_prev:Enable(currentPage > 1)
+        end)
+    end
+    if SettingsUi.controls.color_next ~= nil and SettingsUi.controls.color_next.Enable ~= nil then
+        pcall(function()
+            SettingsUi.controls.color_next:Enable(currentPage < math.max(1, SettingsUi.color_page_count or 1))
+        end)
+    end
+end
+
+local function setColorPage(page)
+    SettingsUi.color_page = Shared.Clamp(page, 1, SettingsUi.color_page_count or 1, 1)
+    refreshColorPage()
+end
+
 local function setActivePage(page)
     SettingsUi.active_page = page
     for name, widgets in pairs(SettingsUi.page_widgets) do
@@ -179,6 +242,9 @@ local function setActivePage(page)
         if ctrl ~= nil and ctrl.SetText ~= nil then
             ctrl:SetText(page == tab.key and ("[" .. tab.text .. "]") or tab.text)
         end
+    end
+    if page == "colors" then
+        refreshColorPage()
     end
 end
 
@@ -244,6 +310,7 @@ local function refreshControls()
     end
     refreshColorValues(style)
     setActivePage(SettingsUi.active_page or "general")
+    refreshColorPage()
 end
 
 local function runAction(key, okText, failText, refreshAfter)
@@ -272,6 +339,7 @@ local function buildContext()
         SettingsUi = SettingsUi,
         addPageWidget = addPageWidget,
         createLabel = createLabel,
+        createButton = createButton,
         createCheckbox = createCheckbox,
         createSlider = createSlider,
         createChoiceRow = createChoiceRow,
@@ -285,7 +353,7 @@ local function ensureWindow()
     if SettingsUi.window ~= nil then
         return
     end
-    local wnd = api.Interface:CreateWindow(Shared.CONSTANTS.WINDOW_ID, "Gharka Bars", 980, 900)
+    local wnd = api.Interface:CreateWindow(Shared.CONSTANTS.WINDOW_ID, "Gharka Bars", BASE_WINDOW_WIDTH, BASE_WINDOW_HEIGHT)
     SettingsUi.window = wnd
     wnd:AddAnchor("CENTER", "UIParent", 0, 0)
     if wnd.SetHandler ~= nil then
@@ -343,6 +411,7 @@ local function ensureWindow()
     end)
 
     refreshControls()
+    applyWindowScale()
     safeShow(wnd, false)
 end
 
@@ -432,6 +501,7 @@ end
 
 function SettingsUi.Toggle()
     ensureWindow()
+    applyWindowScale()
     safeShow(SettingsUi.window, true)
     refreshControls()
 end
@@ -453,6 +523,9 @@ function SettingsUi.Unload()
     SettingsUi.dragging = false
     SettingsUi.active_page = "general"
     SettingsUi.page_widgets = { general = {}, layout = {}, text = {}, colors = {} }
+    SettingsUi.color_page = 1
+    SettingsUi.color_page_count = 1
+    SettingsUi.color_group_widgets = {}
 end
 
 return SettingsUi

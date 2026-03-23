@@ -38,6 +38,8 @@ local VALID_UI_LAYERS = {
 local TARGET_GLOW_COLOR = { 255, 245, 0, 255 }
 local TARGET_TINT_COLOR = { 255, 245, 0, 170 }
 local BLOODLUST_BUFF_ID = 1482
+local HOSTILE_TEXT_COLOR = { 255, 244, 244, 255 }
+local NEUTRAL_TEXT_COLOR = { 40, 28, 0, 255 }
 
 local function clamp(v, lo, hi, default)
     return Shared.Clamp(v, lo, hi, default)
@@ -275,6 +277,24 @@ local function updateCachedText(frame, key, widget, text)
     end
 end
 
+local function updateCachedLabelColor(frame, key, widget, rgba, fallback)
+    if frame == nil or frame.cache == nil or widget == nil then
+        return
+    end
+    local src = type(rgba) == "table" and rgba or fallback or { 255, 255, 255, 255 }
+    local cacheKey = table.concat({
+        tostring(src[1] or ""),
+        tostring(src[2] or ""),
+        tostring(src[3] or ""),
+        tostring(src[4] or "")
+    }, ",")
+    if frame.cache[key] == cacheKey then
+        return
+    end
+    frame.cache[key] = cacheKey
+    Helpers.SetLabelColor(widget, src, fallback)
+end
+
 local function trimText(text, maxChars)
     local raw = tostring(text or "")
     local limit = clamp(maxChars, 0, 64, 0)
@@ -324,23 +344,74 @@ local function unitHasBuff(unit, buffId)
     return false
 end
 
-local function getHpBarColorForUnit(unit, cfg)
-    if unitHasBuff(unit, BLOODLUST_BUFF_ID) then
-        if unit == "target" then
-            return Helpers.Color01(cfg.bloodlust_target_color, { 170, 80, 255, 255 })
-        end
-        if string.match(unit or "", "^team%d+$") then
-            return Helpers.Color01(cfg.bloodlust_team_color, { 255, 140, 40, 255 })
-        end
-    end
-    return Helpers.Color01(cfg.hp_bar_color, { 220, 46, 46, 255 })
+local function isTeamUnit(unit)
+    return string.match(unit or "", "^team%d+$") ~= nil
 end
 
-local function updateHpBarColor(frame, unit, cfg)
+local function isUnitTeamMember(unit)
+    if api.Unit == nil or api.Unit.UnitIsTeamMember == nil then
+        return isTeamUnit(unit)
+    end
+    local result = false
+    pcall(function()
+        result = api.Unit:UnitIsTeamMember(unit) and true or false
+    end)
+    return result
+end
+
+local function isBloodlustFriendlyUnit(unit, info)
+    local faction = type(info) == "table" and tostring(info.faction or "") or ""
+    if faction == "hostile" or faction == "neutral" then
+        return false
+    end
+    if isUnitTeamMember(unit) then
+        return false
+    end
+    local forced = false
+    if api.Unit ~= nil and api.Unit.UnitIsForceAttack ~= nil then
+        pcall(function()
+            forced = api.Unit:UnitIsForceAttack(unit) and true or false
+        end)
+    end
+    return forced or unitHasBuff(unit, BLOODLUST_BUFF_ID)
+end
+
+local function getBarRelation(unit, info)
+    local faction = type(info) == "table" and tostring(info.faction or "") or ""
+    if isBloodlustFriendlyUnit(unit, info) then
+        return "bloodlust"
+    end
+    if faction == "hostile" then
+        return "hostile"
+    end
+    if faction == "neutral" then
+        return "neutral"
+    end
+    return "friendly"
+end
+
+local function getHpBarAppearance(unit, cfg, info)
+    local relation = getBarRelation(unit, info)
+    if relation == "bloodlust" then
+        if isTeamUnit(unit) then
+            return relation, Helpers.Color01(cfg.bloodlust_team_color, { 255, 140, 40, 255 }), nil
+        end
+        return relation, Helpers.Color01(cfg.bloodlust_target_color, { 170, 80, 255, 255 }), nil
+    end
+    if relation == "hostile" then
+        return relation, Helpers.Color01(cfg.hostile_bar_color, { 176, 46, 46, 255 }), HOSTILE_TEXT_COLOR
+    end
+    if relation == "neutral" then
+        return relation, Helpers.Color01(cfg.neutral_bar_color, { 184, 148, 52, 255 }), NEUTRAL_TEXT_COLOR
+    end
+    return relation, Helpers.Color01(cfg.hp_bar_color, { 220, 46, 46, 255 }), nil
+end
+
+local function updateHpBarColor(frame, unit, cfg, info)
     if frame == nil or frame.hpBar == nil or frame.hpBar.statusBar == nil then
         return
     end
-    local rgba = getHpBarColorForUnit(unit, cfg)
+    local relation, rgba, textColor = getHpBarAppearance(unit, cfg, info)
     local key = table.concat({
         tostring(rgba[1] or ""),
         tostring(rgba[2] or ""),
@@ -350,6 +421,16 @@ local function updateHpBarColor(frame, unit, cfg)
     if frame.cache.hp_bar_color_key ~= key then
         frame.cache.hp_bar_color_key = key
         Helpers.ApplyStatusBarColor(frame.hpBar.statusBar, rgba)
+    end
+    frame.cache.hp_bar_relation = relation
+    if textColor ~= nil then
+        updateCachedLabelColor(frame, "name_color_dynamic", frame.nameLabel, textColor, HOSTILE_TEXT_COLOR)
+        updateCachedLabelColor(frame, "hp_color_dynamic", frame.hpValueLabel, textColor, HOSTILE_TEXT_COLOR)
+        updateCachedLabelColor(frame, "mp_color_dynamic", frame.mpValueLabel, textColor, HOSTILE_TEXT_COLOR)
+    else
+        updateCachedLabelColor(frame, "name_color_dynamic", frame.nameLabel, cfg.name_color, { 255, 255, 255, 255 })
+        updateCachedLabelColor(frame, "hp_color_dynamic", frame.hpValueLabel, cfg.value_color, { 255, 255, 255, 255 })
+        updateCachedLabelColor(frame, "mp_color_dynamic", frame.mpValueLabel, cfg.value_color, { 255, 255, 255, 255 })
     end
 end
 
@@ -502,7 +583,7 @@ local function updateOne(unit)
     updateCachedText(frame, "distText", frame.distanceLabel, cfg.show_distance and type(distance) == "number" and string.format("%.0fm", distance) or "")
     updateStatusBar(frame, "hp", frame.hpBar, hp, hpMax)
     updateStatusBar(frame, "mp", frame.mpBar, mp, mpMax)
-    updateHpBarColor(frame, unit, cfg)
+    updateHpBarColor(frame, unit, cfg, info)
     Helpers.SafeShow(frame.nameLabel, cfg.show_name ~= false)
     Helpers.SafeShow(frame.guildLabel, cfg.show_guild and guildText ~= "")
     Helpers.SafeShow(frame.roleLabel, false)

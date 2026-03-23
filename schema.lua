@@ -76,6 +76,8 @@ Schema.TEXT_SLIDERS = {
 
 Schema.COLOR_GROUPS = {
     { key = "hp_bar_color", label = "HP bar" },
+    { key = "hostile_bar_color", label = "Hostile HP" },
+    { key = "neutral_bar_color", label = "Neutral HP" },
     { key = "mp_bar_color", label = "MP bar" },
     { key = "bloodlust_team_color", label = "Bloodlust team" },
     { key = "bloodlust_target_color", label = "Bloodlust target" },

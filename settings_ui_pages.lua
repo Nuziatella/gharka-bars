@@ -160,11 +160,48 @@ function Pages.BuildColorsPage(ctx, wnd)
     ctx.addPageWidget("colors", ctx.createLabel("ghbColorTitle", wnd, "Colors", 24, 98, 16, 220))
     ctx.addPageWidget("colors", ctx.createLabel("ghbColorHint", wnd, "Tune HP/MP bars and text colors. Role colors use built-in tank/healer/melee/ranged/magic colors.", 24, 122, 12, 640))
 
+    local prevBtn = ctx.createButton("ghbColorsPrev", wnd, "Prev", 690, 96, 70, 26)
+    local nextBtn = ctx.createButton("ghbColorsNext", wnd, "Next", 848, 96, 70, 26)
+    local pageLabel = ctx.createLabel("ghbColorsPage", wnd, "Page 1 / 1", 770, 100, 12, 90)
+    ctx.addPageWidget("colors", prevBtn)
+    ctx.addPageWidget("colors", nextBtn)
+    ctx.addPageWidget("colors", pageLabel)
+    ctx.SettingsUi.controls.color_prev = prevBtn
+    ctx.SettingsUi.controls.color_next = nextBtn
+    ctx.SettingsUi.controls.color_page_label = pageLabel
+
+    local groupsPerPage = 4
+    ctx.SettingsUi.color_page_count = math.max(1, math.ceil(#ctx.Schema.COLOR_GROUPS / groupsPerPage))
+    ctx.SettingsUi.color_group_widgets = {}
+
+    if prevBtn ~= nil and prevBtn.SetHandler ~= nil then
+        prevBtn:SetHandler("OnClick", function()
+            ctx.SettingsUi.color_page = math.max(1, (ctx.SettingsUi.color_page or 1) - 1)
+            if ctx.SettingsUi.Refresh ~= nil then
+                ctx.SettingsUi.Refresh()
+            end
+        end)
+    end
+    if nextBtn ~= nil and nextBtn.SetHandler ~= nil then
+        nextBtn:SetHandler("OnClick", function()
+            ctx.SettingsUi.color_page = math.min(ctx.SettingsUi.color_page_count or 1, (ctx.SettingsUi.color_page or 1) + 1)
+            if ctx.SettingsUi.Refresh ~= nil then
+                ctx.SettingsUi.Refresh()
+            end
+        end)
+    end
+
     for index, group in ipairs(ctx.Schema.COLOR_GROUPS) do
-        local colX = index <= 3 and 24 or 500
-        local localIndex = index <= 3 and index or (index - 3)
-        local baseY = 170 + ((localIndex - 1) * 180)
-        ctx.addPageWidget("colors", ctx.createLabel("ghbColorGroup" .. group.key, wnd, group.label, colX, baseY, 15, 220))
+        local page = math.floor((index - 1) / groupsPerPage) + 1
+        local pageIndex = ((index - 1) % groupsPerPage) + 1
+        local colX = pageIndex <= 2 and 24 or 500
+        local localIndex = pageIndex <= 2 and pageIndex or (pageIndex - 2)
+        local baseY = 170 + ((localIndex - 1) * 240)
+        local groupWidgets = {}
+
+        local title = ctx.createLabel("ghbColorGroup" .. group.key, wnd, group.label, colX, baseY, 15, 220)
+        table.insert(groupWidgets, title)
+        ctx.addPageWidget("colors", title)
         local channels = {
             { suffix = "R", index = 1, label = "Red" },
             { suffix = "G", index = 2, label = "Green" },
@@ -174,6 +211,9 @@ function Pages.BuildColorsPage(ctx, wnd)
             local y = baseY + 32 + ((channelOffset - 1) * 38)
             local item = { key = group.key .. "_" .. channel.suffix, label = channel.label, min = 0, max = 255 }
             local label, slider, value = ctx.createSlider("ghbColorSlider" .. group.key .. channel.suffix, wnd, item.label, colX, y, 0, 255)
+            table.insert(groupWidgets, label)
+            table.insert(groupWidgets, slider)
+            table.insert(groupWidgets, value)
             ctx.addPageWidget("colors", label)
             ctx.addPageWidget("colors", slider)
             ctx.addPageWidget("colors", value)
@@ -181,6 +221,10 @@ function Pages.BuildColorsPage(ctx, wnd)
             ctx.SettingsUi.controls["color_slider_val_" .. group.key .. "_" .. channel.index] = value
             bindColorSlider(ctx, group.key, channel.index, slider, value)
         end
+        ctx.SettingsUi.color_group_widgets[group.key] = {
+            page = page,
+            widgets = groupWidgets
+        }
     end
 end
 

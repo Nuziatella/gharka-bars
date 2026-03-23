@@ -54,6 +54,8 @@ local function styleDefaults()
         show_distance = false,
         show_background = true,
         hp_bar_color = { 220, 46, 46, 255 },
+        hostile_bar_color = { 176, 46, 46, 255 },
+        neutral_bar_color = { 184, 148, 52, 255 },
         mp_bar_color = { 46, 122, 240, 255 },
         bloodlust_team_color = { 255, 140, 40, 255 },
         bloodlust_target_color = { 170, 80, 255, 255 },
