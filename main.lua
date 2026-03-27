@@ -19,7 +19,7 @@ local SettingsUi = loadModule("settings_ui")
 local addon = {
     name = "Gharka Bars",
     author = "Nuzi",
-    version = "1.5.1",
+    version = "1.5.3",
     desc = "Overhead raid bars"
 }
 
