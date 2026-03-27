@@ -76,7 +76,7 @@ end
 
 function Pages.BuildGeneralPage(ctx, wnd)
     ctx.addPageWidget("general", ctx.createLabel("ghbGeneralTitle", wnd, "Global Behavior", 24, 98, 16, 220))
-    ctx.addPageWidget("general", ctx.createLabel("ghbGeneralHint", wnd, "Tracking toggles, click behavior, and draw priority for overhead bars.", 24, 122, 12, 620))
+    ctx.addPageWidget("general", ctx.createLabel("ghbGeneralHint", wnd, "Tracking toggles and draw priority for overhead bars.", 24, 122, 12, 620))
     local leftX, rightX, startY, rowGap = 24, 500, 164, 42
     for index, item in ipairs(ctx.Schema.GLOBAL_TOGGLES) do
         local colX = index <= 5 and leftX or rightX

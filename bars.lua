@@ -101,24 +101,6 @@ local function shouldShowUnit(unit, settings)
     return false
 end
 
-local function changeTarget(unit)
-    local tu = Bars.target_unitframe
-    if tu == nil or tu.eventWindow == nil or tu.eventWindow.OnClick == nil then
-        return
-    end
-    pcall(function()
-        tu.target = unit
-        tu.eventWindow:OnClick("LeftButton")
-        tu.target = "target"
-        if tu.ChangedTarget ~= nil then
-            tu:ChangedTarget()
-        end
-        if tu.UpdateAll ~= nil then
-            tu:UpdateAll()
-        end
-    end)
-end
-
 local function ensureUnitKeys()
     if #Bars.unit_keys > 0 then
         return
@@ -215,25 +197,11 @@ local function ensureFrame(unit)
     pcall(function()
         eventWindow:AddAnchor("TOPLEFT", frame, 0, 0)
         eventWindow:AddAnchor("BOTTOMRIGHT", frame, 0, 0)
-        eventWindow:Show(true)
+        eventWindow:Show(false)
         eventWindow:EnableDrag(false)
     end)
+    Helpers.SafeClickable(eventWindow, false)
     frame.eventWindow = eventWindow
-    if eventWindow ~= nil and eventWindow.SetHandler ~= nil then
-        eventWindow:SetHandler("OnClick", function(_, button)
-            local settings = Shared.EnsureSettings()
-            if not settings.click_target or button == "MiddleButton" then
-                return
-            end
-            if settings.click_through_shift and api.Input ~= nil and api.Input.IsShiftKeyDown ~= nil and api.Input:IsShiftKeyDown() then
-                return
-            end
-            if settings.click_through_ctrl and api.Input ~= nil and api.Input.IsControlKeyDown ~= nil and api.Input:IsControlKeyDown() then
-                return
-            end
-            changeTarget(unit)
-        end)
-    end
     frame.cache = {}
     Bars.frames[unit] = frame
     return frame

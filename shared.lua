@@ -69,9 +69,6 @@ end
 Shared.DEFAULT_SETTINGS = {
     enabled = true,
     anchor_to_nametag = true,
-    click_target = true,
-    click_through_shift = true,
-    click_through_ctrl = true,
     show_player = false,
     show_target = true,
     show_watchtarget = true,
