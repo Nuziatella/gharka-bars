@@ -77,7 +77,16 @@ end
 function Pages.BuildGeneralPage(ctx, wnd)
     ctx.addPageWidget("general", ctx.createLabel("ghbGeneralTitle", wnd, "Global Behavior", 24, 98, 16, 220))
     ctx.addPageWidget("general", ctx.createLabel("ghbGeneralHint", wnd, "Tracking toggles and draw priority for overhead bars.", 24, 122, 12, 620))
-    local leftX, rightX, startY, rowGap = 24, 500, 164, 42
+    ctx.addPageWidget("general", ctx.createLabel("ghbRuntimeTitle", wnd, "Runtime", 24, 148, 15, 220))
+    for index = 1, 3 do
+        local line = ctx.createLabel("ghbRuntimeLine" .. tostring(index), wnd, "", 24, 172 + ((index - 1) * 20), 12, 760)
+        ctx.addPageWidget("general", line)
+        ctx.SettingsUi.controls["runtime_line_" .. tostring(index)] = line
+    end
+    local runtimeWarn = ctx.createLabel("ghbRuntimeWarn", wnd, "", 24, 236, 12, 900)
+    ctx.addPageWidget("general", runtimeWarn)
+    ctx.SettingsUi.controls.runtime_warning = runtimeWarn
+    local leftX, rightX, startY, rowGap = 24, 500, 286, 42
     for index, item in ipairs(ctx.Schema.GLOBAL_TOGGLES) do
         local colX = index <= 5 and leftX or rightX
         local rowY = startY + (((index - 1) % 5) * rowGap)
@@ -87,7 +96,7 @@ function Pages.BuildGeneralPage(ctx, wnd)
         ctx.SettingsUi.controls["global_" .. item.key] = cb
         bindGlobalToggle(ctx, item, cb)
     end
-    local choiceY = 386
+    local choiceY = 508
     for _, item in ipairs(ctx.Schema.GLOBAL_CHOICES or {}) do
         local label, btn = ctx.createChoiceRow("ghbGlobalChoice" .. item.key, wnd, item.label, 24, choiceY, 180)
         ctx.addPageWidget("general", label)

@@ -15,6 +15,7 @@ end
 local Shared = loadModule("shared")
 local Schema = loadModule("schema")
 local Pages = loadModule("settings_ui_pages")
+local Compat = loadModule("compat")
 
 local SettingsUi = {
     button = nil,
@@ -282,6 +283,7 @@ end
 local function refreshControls()
     local settings = Shared.EnsureSettings()
     local style = Shared.GetStyleSettings()
+    local runtime = Compat ~= nil and Compat.Get() or nil
     for _, item in ipairs(Schema.GLOBAL_TOGGLES) do
         local ctrl = SettingsUi.controls["global_" .. item.key]
         if ctrl ~= nil and ctrl.SetChecked ~= nil then
@@ -309,6 +311,17 @@ local function refreshControls()
         end
     end
     refreshColorValues(style)
+    local runtimeLines = runtime ~= nil and runtime.runtime_lines or {}
+    for index = 1, 3 do
+        local label = SettingsUi.controls["runtime_line_" .. tostring(index)]
+        if label ~= nil and label.SetText ~= nil then
+            label:SetText(tostring(runtimeLines[index] or ""))
+        end
+    end
+    local runtimeWarn = SettingsUi.controls.runtime_warning
+    if runtimeWarn ~= nil and runtimeWarn.SetText ~= nil then
+        runtimeWarn:SetText(Compat ~= nil and Compat.GetRuntimeStatusText() or "")
+    end
     setActivePage(SettingsUi.active_page or "general")
     refreshColorPage()
 end

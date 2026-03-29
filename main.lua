@@ -15,11 +15,12 @@ end
 local Shared = loadModule("shared")
 local Bars = loadModule("bars")
 local SettingsUi = loadModule("settings_ui")
+local Compat = loadModule("compat")
 
 local addon = {
     name = "Gharka Bars",
     author = "Nuzi",
-    version = "1.5.3",
+    version = "1.5.4",
     desc = "Overhead raid bars"
 }
 
@@ -33,7 +34,27 @@ local function logInfo(message)
 end
 
 local function modulesReady()
-    return Shared ~= nil and Bars ~= nil and SettingsUi ~= nil
+    return Shared ~= nil and Bars ~= nil and SettingsUi ~= nil and Compat ~= nil
+end
+
+local function logRuntimeSummary()
+    local runtime = Compat.Get()
+    local caps = runtime.caps or {}
+    logInfo(string.format(
+        "Runtime render=%s sliders=%s anchor=%s statusbars=%s",
+        caps.render_supported and "yes" or "no",
+        caps.slider_factory and "yes" or "no",
+        caps.nametag_anchor and "nametag" or (caps.screen_position and "screen" or "none"),
+        caps.statusbar_factory and "yes" or "no"
+    ))
+    for _, warning in ipairs(runtime.warnings or {}) do
+        logInfo(warning)
+    end
+    for _, blocker in ipairs(runtime.blockers or {}) do
+        if api.Log ~= nil and api.Log.Err ~= nil then
+            api.Log:Err("[Gharka Bars] " .. tostring(blocker))
+        end
+    end
 end
 
 local function buildActions()
@@ -81,6 +102,7 @@ end
 local function onUiReloaded()
     dataElapsedMs = 0
     positionElapsedMs = 0
+    Compat.Probe(true)
     Bars.Reset()
     SettingsUi.Unload()
     Bars.Init()
@@ -111,6 +133,8 @@ local function onLoad()
         return
     end
     Shared.LoadSettings()
+    Compat.Probe(true)
+    logRuntimeSummary()
     Bars.Init()
     SettingsUi.Init(buildActions())
     Bars.Update()

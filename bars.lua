@@ -16,6 +16,7 @@ local Shared = loadModule("shared")
 local Helpers = loadModule("bar_helpers")
 local Layout = loadModule("bars_layout")
 local Role = loadModule("role")
+local Compat = loadModule("compat")
 
 local Bars = {
     frames = {},
@@ -573,6 +574,9 @@ local function updateOne(unit)
 end
 
 function Bars.Init()
+    if Compat ~= nil then
+        Compat.Probe(false)
+    end
     ensureUnitKeys()
     Bars.layer_mode = currentLayerMode(Shared.EnsureSettings())
     if ADDON ~= nil and ADDON.GetContent ~= nil and UIC ~= nil then
@@ -583,6 +587,10 @@ function Bars.Init()
 end
 
 function Bars.Update()
+    if Compat ~= nil and not Compat.IsRenderable() then
+        Bars.Reset()
+        return
+    end
     syncLayerMode(Shared.EnsureSettings())
     for _, unit in ipairs(Bars.unit_keys) do
         updateOne(unit)
@@ -591,6 +599,10 @@ end
 Bars.UpdateData = Bars.Update
 function Bars.UpdatePositions()
     local settings = Shared.EnsureSettings()
+    if Compat ~= nil and not Compat.IsRenderable() then
+        Bars.Reset()
+        return
+    end
     syncLayerMode(settings)
     if not settings.enabled then
         Bars.Reset()
