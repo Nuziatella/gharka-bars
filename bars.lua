@@ -171,12 +171,16 @@ local function registerEventWindowClicks(widget)
     if widget == nil or widget.RegisterForClicks == nil then
         return
     end
+    if widget.__nnp_clicks_registered == true then
+        return
+    end
     pcall(function()
         widget:RegisterForClicks("LeftButtonUp")
     end)
     pcall(function()
         widget:RegisterForClicks("LeftButton")
     end)
+    widget.__nnp_clicks_registered = true
 end
 
 local function safeCreateCcIcon(id, parent)
@@ -384,9 +388,6 @@ local function canClickTargetUnit(unit, settings)
     if type(settings) ~= "table" or settings.click_target ~= true then
         return false
     end
-    if shouldPassThroughClick(settings) then
-        return false
-    end
     unit = normalizeTargetToken(unit)
     if unit == "target" or shouldPassThroughUnit(unit) then
         return false
@@ -429,21 +430,28 @@ local function setHoverHighlight(frame, enabled)
     end
 end
 
-local function setEventWindowInteraction(frame, enabled)
+local function setEventWindowInteraction(frame, enabled, passThrough)
     if frame == nil then
         return
     end
     local interactive = enabled and true or false
+    local pickable = interactive and passThrough ~= true
     frame.__nnp_click_target = interactive
     if frame.eventWindow == nil then
         return
     end
-    if not interactive then
+    if not pickable then
+        if Bars.hovered_unit == frame.__nnp_unit then
+            Bars.hovered_unit = nil
+        end
         setHoverHighlight(frame, false)
     end
-    Helpers.SafeShow(frame.eventWindow, interactive)
-    setWidgetPickable(frame.eventWindow, interactive)
-    if interactive then
+    if frame.__nnp_event_pickable ~= pickable then
+        Helpers.SafeShow(frame.eventWindow, pickable)
+        setWidgetPickable(frame.eventWindow, pickable)
+        frame.__nnp_event_pickable = pickable
+    end
+    if pickable then
         registerEventWindowClicks(frame.eventWindow)
         raiseWidget(frame.eventWindow)
     end
@@ -610,13 +618,17 @@ local function normalizeUnitId(unitId)
     end
     local valueType = type(unitId)
     if valueType == "string" then
-        local text = tostring(unitId)
-        if text == "" then
+        local text = tostring(unitId):gsub("^%s+", ""):gsub("%s+$", "")
+        local lowerText = string.lower(text)
+        if text == "" or text == "0" or lowerText == "nil" or lowerText == "null" then
             return nil
         end
         return text
     end
     if valueType == "number" then
+        if unitId == 0 then
+            return nil
+        end
         return tostring(unitId)
     end
     return nil
@@ -824,7 +836,12 @@ local function getUnitInfo(unitId)
     if normalizedId == nil or api.Unit == nil or api.Unit.GetUnitInfoById == nil then
         return nil
     end
-    local info = api.Unit:GetUnitInfoById(normalizedId)
+    local ok, info = pcall(function()
+        return api.Unit:GetUnitInfoById(normalizedId)
+    end)
+    if not ok then
+        return nil
+    end
     if type(info) ~= "table" then
         return nil
     end
@@ -1484,6 +1501,9 @@ local function ensureFrame(unit)
                 return
             end
             if frame.__nnp_click_target ~= true then
+                return
+            end
+            if shouldPassThroughClick(Shared.EnsureSettings()) then
                 return
             end
             local clickUnit = frame.__nnp_unit or unit
@@ -2468,7 +2488,7 @@ local function updateOne(unit, context)
     end
 
     applyPassThrough(frame, shouldPassThroughUnit(unit))
-    setEventWindowInteraction(frame, canClickTargetUnit(unit, settings))
+    setEventWindowInteraction(frame, canClickTargetUnit(unit, settings), shouldPassThroughClick(settings))
     setFrameDisplayEnabled(frame, true)
     frame.cache.data_active = true
     if context.include_position ~= false then
@@ -2600,11 +2620,15 @@ local function getVisibleBulkDataBatchSize(visibleCount)
     return count
 end
 
+local function deactivateStockNametag()
+    Bars.stock_nametag_active = false
+    Bars.stock_nametag_color_key = nil
+end
+
 local function prepareUpdateState()
     local settings = Shared.EnsureSettings()
     if not settings.enabled then
-        Bars.stock_nametag_active = false
-        Bars.stock_nametag_color_key = nil
+        deactivateStockNametag()
         Bars.Reset()
         return nil, nil
     end
@@ -2616,8 +2640,7 @@ local function prepareUpdateState()
         Bars.stock_nametag_active = true
         return nil, nil
     end
-    Bars.stock_nametag_active = false
-    Bars.stock_nametag_color_key = nil
+    deactivateStockNametag()
     if Compat ~= nil and not Compat.IsRenderable() then
         Bars.Reset()
         return nil, nil
@@ -2647,7 +2670,7 @@ local function updatePositionsForUnits(unitKeys, settings, cfg, positionSources,
                 end
             elseif frame.cache.data_active then
                 applyPassThrough(frame, shouldPassThroughUnit(unit))
-                setEventWindowInteraction(frame, canClickTargetUnit(unit, settings))
+                setEventWindowInteraction(frame, canClickTargetUnit(unit, settings), shouldPassThroughClick(settings))
                 local positionUnit = type(positionSources) == "table" and positionSources[unit] or unit
                 local screenX, screenY, screenZ = resolveStableScreenPosition(frame, positionUnit, settings, nowMs, unit)
                 if screenX == nil or screenY == nil or (screenZ ~= nil and screenZ < 0) then
@@ -2870,6 +2893,19 @@ function Bars.GetBulkPositionIntervalMs()
     return getBulkPositionIntervalMs()
 end
 
+function Bars.SyncClickThroughState()
+    local settings = Shared.state.settings
+    if type(settings) ~= "table" or settings.enabled ~= true then
+        return
+    end
+    local passThrough = shouldPassThroughClick(settings)
+    for unit, frame in pairs(Bars.frames or {}) do
+        if frame ~= nil and frame.cache ~= nil and frame.cache.display_enabled == true and frame.cache.data_active == true then
+            setEventWindowInteraction(frame, canClickTargetUnit(unit, settings), passThrough)
+        end
+    end
+end
+
 function Bars.UpdatePositions()
     local settings, cfg = prepareUpdateState()
     if settings == nil then
@@ -2897,6 +2933,7 @@ function Bars.Reset()
     Bars.owner_source_last_build_ms = 0
     Bars.last_visible_bulk_position_ms = 0
     Bars.stock_nametag_active = false
+    Bars.stock_nametag_color_key = nil
     for _, frame in pairs(Bars.frames) do
         hideFrame(frame)
     end

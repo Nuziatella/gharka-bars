@@ -16,16 +16,16 @@ local SETTERS = {
 }
 
 local DEFAULT_COLORS = {
-    friendly = { 255, 240, 100, 255 },
-    friendly_npc = { 247, 232, 76, 255 },
-    neutral = { 184, 148, 52, 255 },
-    party = { 76, 204, 234, 255 },
-    raid = { 39, 139, 252, 255 },
-    raid_pk = { 255, 45, 0, 255 },
-    pk = { 170, 80, 255, 255 },
-    enemy = { 255, 0, 0, 255 },
-    monster = { 255, 0, 0, 255 },
-    pirate = { 255, 156, 39, 255 }
+    friendly = { 144, 206, 103, 255 },
+    friendly_npc = { 255, 240, 100, 255 },
+    neutral = { 255, 240, 100, 255 },
+    party = { 118, 195, 196, 255 },
+    raid = { 131, 203, 237, 255 },
+    raid_pk = { 131, 133, 237, 255 },
+    pk = { 170, 130, 240, 255 },
+    enemy = { 250, 100, 100, 255 },
+    monster = { 250, 100, 100, 255 },
+    pirate = { 250, 120, 190, 255 }
 }
 
 local function getNametagApi()
@@ -68,38 +68,32 @@ local function decimalColorString(rgba, fallback)
     return tostring((r * 65536) + (g * 256) + b)
 end
 
-local function buildColors(cfg)
-    cfg = type(cfg) == "table" and cfg or {}
+local function buildColors()
     return {
-        friendly = decimalColorString(cfg.hp_bar_color, DEFAULT_COLORS.friendly),
-        friendly_npc = decimalColorString(cfg.hp_bar_color, DEFAULT_COLORS.friendly_npc),
-        neutral = decimalColorString(cfg.neutral_bar_color, DEFAULT_COLORS.neutral),
-        party = decimalColorString(cfg.hp_bar_color, DEFAULT_COLORS.party),
-        raid = decimalColorString(cfg.hp_bar_color, DEFAULT_COLORS.raid),
-        raid_pk = decimalColorString(cfg.bloodlust_team_color, DEFAULT_COLORS.raid_pk),
-        pk = decimalColorString(cfg.bloodlust_target_color, DEFAULT_COLORS.pk),
-        enemy = decimalColorString(cfg.hostile_bar_color, DEFAULT_COLORS.enemy),
-        monster = decimalColorString(cfg.hostile_bar_color, DEFAULT_COLORS.monster),
-        pirate = decimalColorString(cfg.hostile_bar_color, DEFAULT_COLORS.pirate)
+        friendly = decimalColorString(DEFAULT_COLORS.friendly, DEFAULT_COLORS.friendly),
+        friendly_npc = decimalColorString(DEFAULT_COLORS.friendly_npc, DEFAULT_COLORS.friendly_npc),
+        neutral = decimalColorString(DEFAULT_COLORS.neutral, DEFAULT_COLORS.neutral),
+        party = decimalColorString(DEFAULT_COLORS.party, DEFAULT_COLORS.party),
+        raid = decimalColorString(DEFAULT_COLORS.raid, DEFAULT_COLORS.raid),
+        raid_pk = decimalColorString(DEFAULT_COLORS.raid_pk, DEFAULT_COLORS.raid_pk),
+        pk = decimalColorString(DEFAULT_COLORS.pk, DEFAULT_COLORS.pk),
+        enemy = decimalColorString(DEFAULT_COLORS.enemy, DEFAULT_COLORS.enemy),
+        monster = decimalColorString(DEFAULT_COLORS.monster, DEFAULT_COLORS.monster),
+        pirate = decimalColorString(DEFAULT_COLORS.pirate, DEFAULT_COLORS.pirate)
     }
 end
 
-function StockNametag.Apply(cfg, state)
-    local nametag = getNametagApi()
-    if nametag == nil or not hasColorApi() then
-        return false
-    end
+local STOCK_COLORS = buildColors()
 
-    local values = buildColors(cfg)
+local function buildColorKey(values)
     local keyParts = {}
     for _, item in ipairs(SETTERS) do
         keyParts[#keyParts + 1] = item.fn .. "=" .. tostring(values[item.key] or "")
     end
-    local colorKey = table.concat(keyParts, ";")
-    if type(state) == "table" and state.stock_nametag_color_key == colorKey then
-        return true
-    end
+    return table.concat(keyParts, ";")
+end
 
+local function applyColors(nametag, values)
     local applied = true
     for _, item in ipairs(SETTERS) do
         local color = values[item.key]
@@ -113,6 +107,21 @@ function StockNametag.Apply(cfg, state)
             end
         end
     end
+    return applied
+end
+
+function StockNametag.Apply(_, state)
+    local nametag = getNametagApi()
+    if nametag == nil or not hasColorApi() then
+        return false
+    end
+
+    local colorKey = buildColorKey(STOCK_COLORS)
+    if type(state) == "table" and state.stock_nametag_color_key == colorKey then
+        return true
+    end
+
+    local applied = applyColors(nametag, STOCK_COLORS)
     if applied and type(state) == "table" then
         state.stock_nametag_color_key = colorKey
     end

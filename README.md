@@ -75,4 +75,4 @@ You can:
 - The launcher icon has its own saved position file so profile swaps do not reset it.
 - AAClassic does not expose addon targeting for `target`, `watchtarget`, or `targettarget`; `watchtarget` and `targettarget` bars are click-through so the stock/game target behind them can receive the click.
 
-1.6.8
+1.6.12

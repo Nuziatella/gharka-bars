@@ -41,7 +41,7 @@ local Compat = modules.compat
 local addon = {
     name = "Nuzi Nameplates",
     author = "Nuzi",
-    version = "1.6.8",
+    version = "1.6.12",
     desc = "Overhead raid nameplates"
 }
 
@@ -234,6 +234,10 @@ end
 local function onUpdate(dt)
     if not modulesReady() then
         return
+    end
+
+    if Bars.SyncClickThroughState ~= nil then
+        Bars.SyncClickThroughState()
     end
 
     local bulkPositionIntervalMs = 16
